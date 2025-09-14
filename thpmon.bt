@@ -1,0 +1,56 @@
+
+/*kretprobe:do_huge_pmd_anonymous_page
+{
+      if (retval == 2048 && comm == "bfs")
+      {
+      //@hugefallback = count();
+      printf("do_huge_pmd_anonymous_page called by %s ret %d\n", comm,retval);
+      }
+}*/
+
+/*kprobe:do_anonymous_page
+{
+  printf("Page fault in do_anonymous_page %s\n",comm);
+}*/
+
+/*kretfunc:khugepaged_scan_mm_slot
+{
+
+printf("%d %d %s\n",args->pages,retval,comm);
+}*/
+
+kfunc:khugepaged_scan_pmd
+{
+@scanstart = nsecs;
+}
+
+kretfunc:khugepaged_scan_pmd
+{
+printf("0x%lx %s %d %lu\n",args->address, args->mm->owner->comm, retval, nsecs-@scanstart);
+}
+
+kretprobe:__alloc_pages
+{
+/*if (args->order == 9 && retval == 0)
+{
+printf("alloc pages order %d ret %d comm %s\n",args->order,retval,comm);
+}*/
+}
+
+kretprobe:mm_find_pmd
+{
+if (retval != 0)
+{
+//printf("mm find pmd %lx\n", *retval);
+}
+}
+
+kfunc:collapse_huge_page
+{
+//printf("collapse huge page\n");
+}
+
+tracepoint:huge_memory:mm_collapse_huge_page
+{
+//printf("ret %d\n",args->status);
+}
