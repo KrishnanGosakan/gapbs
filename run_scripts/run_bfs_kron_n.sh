@@ -16,6 +16,22 @@ if [[ ! -v iters ]]; then
    iters=5
 fi
 
+if [[ ! -v recordbpf ]]; then
+   recordbpf=0
+fi
+
+if [ "$recordbpf" -eq 1 ]; then
+   echo "recording with bpftrace"
+   bpftrace thpmon.bt -o thprec &
+fi
+
+if [[ ! -v disturb ]]; then
+   disturb=0
+fi
+
+if [ "$disturb" -eq 1 ]; then
+   echo "will disturb"
+fi
 echo "running for $graph for N=$bfs_N"
 
 ./run_scripts/drop_cache.sh
@@ -27,11 +43,10 @@ numactl -N 0 vmtouch -t benchmark/graphs/$graph.sg
 numactl --hardware
 
 if  [ "$mem_pressure" -eq 1 ]; then
-    numactl -m 0 ../tormentor/fragtor 535 &
-    numactl -m 1 ../tormentor/fragtor 670 &
+    numactl ../tormentor/fragtor &
 
 
-    sleep 200
+    sleep 250
 
     numactl --hardware
 fi
@@ -39,7 +54,11 @@ fi
 if [ "$always" -eq 1 ]; then
    echo always > /sys/kernel/mm/transparent_hugepage/enabled
    #echo always > /sys/kernel/mm/transparent_hugepage/defrag
-   #echo 0 > /proc/sys/vm/compaction_proactiveness
+   echo 90 > /proc/sys/vm/compaction_proactiveness
+fi
+
+if [ "$disturb" -eq 1 ]; then
+   ./do_disturb.sh &
 fi
 
 for i in $(seq $iters)
@@ -50,7 +69,7 @@ done
 if [ "$always" -eq 1 ]; then
    echo madvise > /sys/kernel/mm/transparent_hugepage/enabled
    #echo madvise > /sys/kernel/mm/transparent_hugepage/defrag
-   #echo 20 > /proc/sys/vm/compaction_proactiveness
+   echo 20 > /proc/sys/vm/compaction_proactiveness
 fi
 
 if  [ "$mem_pressure" -eq 1 ]; then
@@ -61,7 +80,9 @@ if  [ "$mem_pressure" -eq 1 ]; then
     numactl --hardware
 fi
 
-pkill bpftrace
+if [ "$recordbpf" -eq 1 ]; then
+   pkill bpftrace
+fi
 
 vmtouch -e benchmark/graphs/$graph.sg
 
